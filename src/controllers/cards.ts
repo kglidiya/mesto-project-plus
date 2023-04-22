@@ -18,27 +18,16 @@ export const getCards = async (req: Request, res: Response) => {
 export const createCard = async (req: Request, res: Response) => {
   const requestCustom = req as IRequestCustom;
   try {
-    const { name, link } = req.body;
-    if (!name || !link) {
-      const error = new Error('Заполнены не все обязательны поля');
-      error.name = 'CustomValid';
-      throw error;
-    }
     const newCard = await Card.create({
       ...req.body,
       owner: requestCustom.user._id,
     });
     return res.status(errorStatus.CREATED).send(newCard);
   } catch (error) {
-    if (error instanceof Error && error.name === 'CustomValid') {
-      return res
-        .status(errorStatus.BAD_REQUEST)
-        .send({ message: error.message });
-    }
     if (error instanceof mongoose.Error.ValidationError) {
       return res
         .status(errorStatus.BAD_REQUEST)
-        .send({ message: 'Переданы некорректные данные' });
+        .send({ message: 'Переданы некорректные или неполные данные' });
     }
     return res
       .status(errorStatus.INTERNAL_SERVER_ERROR)
@@ -78,8 +67,16 @@ export const likeCard = async (req: Request, res: Response) => {
       { $addToSet: { likes: requestCustom.user._id } },
       { new: true },
     );
+    if (!likes) {
+      const error = new Error('Карточка не найдена');
+      error.name = 'NotFound';
+      throw error;
+    }
     return res.status(errorStatus.OK).send(likes);
   } catch (error) {
+    if (error instanceof Error && error.name === 'NotFound') {
+      return res.status(errorStatus.NOT_FOUND).send({ message: error.message });
+    }
     if (error instanceof mongoose.Error.CastError) {
       return res
         .status(errorStatus.BAD_REQUEST)
@@ -99,8 +96,16 @@ export const dislikeCard = async (req: Request, res: Response) => {
       { $pull: { likes: requestCustom.user._id } },
       { new: true },
     );
+    if (!likes) {
+      const error = new Error('Карточка не найдена');
+      error.name = 'NotFound';
+      throw error;
+    }
     return res.status(errorStatus.OK).send(likes);
   } catch (error) {
+    if (error instanceof Error && error.name === 'NotFound') {
+      return res.status(errorStatus.NOT_FOUND).send({ message: error.message });
+    }
     if (error instanceof mongoose.Error.CastError) {
       return res
         .status(errorStatus.BAD_REQUEST)

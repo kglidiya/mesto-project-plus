@@ -1,7 +1,7 @@
 import '../env';
 import express, { Request, Response, RequestHandler } from 'express';
 import mongoose from 'mongoose';
-import path from 'path';
+import errorStatus from './utils';
 import { IRequestCustom } from './types';
 import cardRouter from './routes/cards';
 import userRouter from './routes/users';
@@ -9,7 +9,6 @@ import userRouter from './routes/users';
 const { PORT = 3000 } = process.env;
 
 const app = express();
-app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }) as RequestHandler);
 app.use(express.json() as RequestHandler);
 app.use((req: Request, res: Response, next) => {
@@ -22,6 +21,11 @@ app.use((req: Request, res: Response, next) => {
 
 app.use(userRouter);
 app.use(cardRouter);
+app.use((req: Request, res: Response) => {
+  res
+    .status(errorStatus.BAD_REQUEST)
+    .send({ message: 'Несуществующий роут' });
+});
 
 async function connect() {
   try {

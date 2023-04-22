@@ -41,24 +41,13 @@ export const getUserById = async (req: Request, res: Response) => {
 
 export const createUser = async (req: Request, res: Response) => {
   try {
-    const { name, about, avatar } = req.body;
-    if (!name || !about || !avatar) {
-      const error = new Error('Заполнены не все обязательны поля');
-      error.name = 'CustomValid';
-      throw error;
-    }
     const newUser = await User.create(req.body);
     return res.status(errorStatus.CREATED).send(newUser);
   } catch (error) {
-    if (error instanceof Error && error.name === 'CustomValid') {
-      return res
-        .status(errorStatus.BAD_REQUEST)
-        .send({ message: error.message });
-    }
     if (error instanceof mongoose.Error.ValidationError) {
       return res
         .status(errorStatus.BAD_REQUEST)
-        .send({ message: 'Переданы некорректные данные' });
+        .send({ message: 'Переданы некорректные или неполные данные' });
     }
     return res
       .status(errorStatus.INTERNAL_SERVER_ERROR)
@@ -74,6 +63,7 @@ export const updateUserById = async (req: Request, res: Response) => {
       req.body,
       {
         new: true,
+        runValidators: true,
       },
     );
     return res.status(errorStatus.OK).send(user);
@@ -82,6 +72,11 @@ export const updateUserById = async (req: Request, res: Response) => {
       return res
         .status(errorStatus.BAD_REQUEST)
         .send({ message: 'Переданы некорректные данные' });
+    }
+    if (error instanceof mongoose.Error.ValidationError) {
+      return res
+        .status(errorStatus.BAD_REQUEST)
+        .send({ message: 'Переданы невалидные данные' });
     }
     return res
       .status(errorStatus.INTERNAL_SERVER_ERROR)
@@ -97,6 +92,7 @@ export const updateAvatarById = async (req: Request, res: Response) => {
       req.body,
       {
         new: true,
+        runValidators: true,
       },
     );
     return res.status(errorStatus.OK).send(user);
@@ -105,6 +101,11 @@ export const updateAvatarById = async (req: Request, res: Response) => {
       return res
         .status(errorStatus.BAD_REQUEST)
         .send({ message: 'Переданы некорректные данные' });
+    }
+    if (error instanceof mongoose.Error.ValidationError) {
+      return res
+        .status(errorStatus.BAD_REQUEST)
+        .send({ message: 'Переданы невалидные данные' });
     }
     return res
       .status(errorStatus.INTERNAL_SERVER_ERROR)
