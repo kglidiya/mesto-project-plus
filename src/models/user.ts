@@ -1,28 +1,70 @@
-import mongoose, { model } from 'mongoose';
+import {
+  model, Model, Schema, Document,
+} from 'mongoose';
+import bcrypt from 'bcrypt';
+import UnauthorizedError from '../errors/unauthorized-err';
 
 export interface IUser {
+  email: string;
+  password: string;
   name: string;
   about: string;
   avatar: string;
 }
 
-const userSchema = new mongoose.Schema<IUser>({
-  name: {
-    type: String,
-    minlength: 2,
-    maxlength: 30,
-    required: true,
-  },
-  about: {
-    type: String,
-    minlength: 2,
-    maxlength: 200,
-    required: true,
-  },
-  avatar: {
-    type: String,
-    required: true,
-  },
-}, { versionKey: false });
+interface UserModel extends Model<IUser> {
+  // eslint-disable-next-line no-unused-vars
+  findUserByCredentials: (email: string, password: string) => Promise<Document<unknown, any, IUser>>
+}
 
-export default model<IUser>('user', userSchema);
+const userSchema = new Schema<IUser, UserModel>(
+  {
+    email: {
+      type: Schema.Types.String,
+      unique: true,
+      required: true,
+    },
+    password: {
+      type: String,
+      required: true,
+      select: false,
+    },
+    name: {
+      type: String,
+      minlength: 2,
+      maxlength: 30,
+      default: 'Жак-Ив Кусто',
+    },
+    about: {
+      type: String,
+      minlength: 2,
+      maxlength: 200,
+      default: 'Исследователь',
+    },
+    avatar: {
+      type: String,
+      default: 'https://pictures.s3.yandex.net/resources/jacques-cousteau_1604399756.png',
+    },
+  },
+  { versionKey: false },
+);
+
+userSchema.static('findUserByCredentials', function findUserByCredentials(email: string, password: string) {
+  return this.findOne({ email }).select('+password')
+    .then((user) => {
+      if (!user) {
+        return Promise.reject(new UnauthorizedError('Неправильные почта или пароль'));
+      }
+
+      return bcrypt.compare(password, user.password)
+        .then((matched) => {
+          if (!matched) {
+            return Promise.reject(new UnauthorizedError('Неправильные почта или пароль'));
+          }
+
+          return user;
+        });
+    });
+});
+
+export default model<IUser, UserModel>('User', userSchema);

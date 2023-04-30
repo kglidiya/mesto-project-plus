@@ -1,61 +1,96 @@
-import { Request, Response } from 'express';
+import * as dotenv from 'dotenv';
+import { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
+import NotFoundError from '../errors/not-found-err';
+import BadRequestError from '../errors/bad-request-err';
+import ConflictError from '../errors/conflict-err';
 import User from '../models/user';
 import { IRequestCustom } from '../types';
-import errorStatus from '../utils';
+import { resStatus } from '../utils';
 
-export const getUsers = async (req: Request, res: Response) => {
+dotenv.config();
+
+export const createUser = async (req: Request, res: Response, next: NextFunction) => {
+  const {
+    email, password, name, about, avatar,
+  } = req.body;
   try {
-    const users = await User.find({});
-    return res.status(errorStatus.OK).send(users);
+    const newUser = await bcrypt
+      .hash(password, 10)
+      .then((hash: string) => User.create({
+        email,
+        password: hash,
+        name,
+        about,
+        avatar,
+      }))
+      .then((user) => {
+        res.status(resStatus.CREATED).send(user);
+      });
+    return newUser;
   } catch (error) {
-    return res
-      .status(errorStatus.INTERNAL_SERVER_ERROR)
-      .send({ message: 'Ошибка на стороне сервера' });
+    if (error instanceof Error && String(error.message).startsWith('E11000')) {
+      return next(new ConflictError('Пользователь с такой почтой уже сущестует'));
+    }
+    return next(error);
   }
 };
 
-export const getUserById = async (req: Request, res: Response) => {
+export const login = async (req: Request, res: Response, next: NextFunction) => {
+  const { email, password } = req.body;
+  try {
+    const userLoggedIn = await User.findUserByCredentials(email, password).then(
+      (user) => {
+        const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET as string, {
+          expiresIn: '7d',
+        });
+        res.cookie('jwt', token, { maxAge: 3600000 * 24 * 7, httpOnly: true }).end();
+      },
+    );
+    return userLoggedIn;
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getUsers = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const users = await User.find({});
+    return res.status(resStatus.OK).send(users);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getUserById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = await User.findById(req.params.userId);
     if (!user) {
-      const error = new Error('Пользователь не найден');
-      error.name = 'NotFound';
+      const error = new NotFoundError('Пользователь не найден');
       throw error;
     }
-    return res.status(errorStatus.OK).send(user);
+    return res.status(resStatus.OK).send(user);
   } catch (error) {
-    if (error instanceof Error && error.name === 'NotFound') {
-      return res.status(errorStatus.NOT_FOUND).send({ message: error.message });
-    }
     if (error instanceof mongoose.Error.CastError) {
-      return res
-        .status(errorStatus.BAD_REQUEST)
-        .send({ message: 'Переданы некорректные данные' });
+      return next(new BadRequestError('Переданы невалидные данные'));
     }
-    return res
-      .status(errorStatus.INTERNAL_SERVER_ERROR)
-      .send({ message: 'Ошибка на стороне сервера' });
+    return next(error);
   }
 };
 
-export const createUser = async (req: Request, res: Response) => {
+export const getUserMe = async (req: Request, res: Response, next: NextFunction) => {
+  const requestCustom = req as IRequestCustom;
   try {
-    const newUser = await User.create(req.body);
-    return res.status(errorStatus.CREATED).send(newUser);
+    const user = await User.findById(requestCustom.user._id);
+    return res.status(resStatus.OK).send(user);
   } catch (error) {
-    if (error instanceof mongoose.Error.ValidationError) {
-      return res
-        .status(errorStatus.BAD_REQUEST)
-        .send({ message: 'Переданы некорректные или неполные данные' });
-    }
-    return res
-      .status(errorStatus.INTERNAL_SERVER_ERROR)
-      .send({ message: 'Ошибка на стороне сервера' });
+    return next(error);
   }
 };
 
-export const updateUserById = async (req: Request, res: Response) => {
+export const updateUserById = async (req: Request, res: Response, next: NextFunction) => {
   const requestCustom = req as IRequestCustom;
   try {
     const user = await User.findByIdAndUpdate(
@@ -66,25 +101,13 @@ export const updateUserById = async (req: Request, res: Response) => {
         runValidators: true,
       },
     );
-    return res.status(errorStatus.OK).send(user);
+    return res.status(resStatus.OK).send(user);
   } catch (error) {
-    if (error instanceof mongoose.Error.CastError) {
-      return res
-        .status(errorStatus.BAD_REQUEST)
-        .send({ message: 'Переданы некорректные данные' });
-    }
-    if (error instanceof mongoose.Error.ValidationError) {
-      return res
-        .status(errorStatus.BAD_REQUEST)
-        .send({ message: 'Переданы невалидные данные' });
-    }
-    return res
-      .status(errorStatus.INTERNAL_SERVER_ERROR)
-      .send({ message: 'Ошибка на стороне сервера' });
+    return next(error);
   }
 };
 
-export const updateAvatarById = async (req: Request, res: Response) => {
+export const updateAvatarById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const requestCustom = req as IRequestCustom;
     const user = await User.findByIdAndUpdate(
@@ -95,21 +118,9 @@ export const updateAvatarById = async (req: Request, res: Response) => {
         runValidators: true,
       },
     );
-    return res.status(errorStatus.OK).send(user);
+    return res.status(resStatus.OK).send(user);
   } catch (error) {
-    if (error instanceof mongoose.Error.CastError) {
-      return res
-        .status(errorStatus.BAD_REQUEST)
-        .send({ message: 'Переданы некорректные данные' });
-    }
-    if (error instanceof mongoose.Error.ValidationError) {
-      return res
-        .status(errorStatus.BAD_REQUEST)
-        .send({ message: 'Переданы невалидные данные' });
-    }
-    return res
-      .status(errorStatus.INTERNAL_SERVER_ERROR)
-      .send({ message: 'Ошибка на стороне сервера' });
+    return next(error);
   }
 };
 

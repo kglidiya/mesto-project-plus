@@ -1,9 +1,9 @@
-const errorStatus = {
+export const resStatus = {
   OK: 200,
   CREATED: 201,
-  NOT_FOUND: 404,
-  BAD_REQUEST: 400,
-  INTERNAL_SERVER_ERROR: 500,
 };
 
-export default errorStatus;
+export const linkRegex = /^https?:\/\/(www\.)?[\w-\\.]+\.[a-z]{2,3}[\w-._~:/?#[\]@!$&'()*+,;=]*#?/;
+export const emailRegex = /^[A-Z0-9._%+-]+@[A-Z0-9-]+.+.[A-Z]{2,4}$/i;
+
+export default {};
