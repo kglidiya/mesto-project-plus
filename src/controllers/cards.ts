@@ -9,7 +9,7 @@ import BadRequestError from '../errors/bad-request-err';
 
 export const getCards = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const cards = await Card.find({});
+    const cards = await Card.find({}).populate(['owner', 'likes']);
     return res.status(resStatus.OK).send(cards);
   } catch (error) {
     return next(error);
@@ -22,9 +22,13 @@ export const createCard = async (req: Request, res: Response, next: NextFunction
     const newCard = await Card.create({
       ...req.body,
       owner: requestCustom.user._id,
+      runValidators: true,
     });
     return res.status(resStatus.CREATED).send(newCard);
   } catch (error) {
+    if (error instanceof mongoose.Error.ValidationError) {
+      return next(new BadRequestError('Переданы некорректные данные'));
+    }
     return next(error);
   }
 };
@@ -34,13 +38,13 @@ export const deleteCardById = async (req: Request, res: Response, next: NextFunc
   try {
     const card = await Card.findById({
       _id: req.params.cardId,
-    });
+    }).populate(['owner', 'likes']) as any;
     if (!card) {
       const error = new NotFoundError('Такой карточки не существует');
       throw error;
     }
     let cardToDelete;
-    if (String(card.owner) === String(requestCustom.user._id)) {
+    if (String(card.owner._id) === String(requestCustom.user._id)) {
       cardToDelete = await Card.findByIdAndRemove({
         _id: req.params.cardId,
       });
@@ -65,7 +69,7 @@ export const likeCard = async (req: Request, res: Response, next: NextFunction) 
       req.params.cardId,
       { $addToSet: { likes: requestCustom.user._id } },
       { new: true },
-    );
+    ).populate(['owner', 'likes']);
     if (!likes) {
       const error = new NotFoundError('Такой карточки не существует');
       throw error;
@@ -86,7 +90,7 @@ export const dislikeCard = async (req: Request, res: Response, next: NextFunctio
       req.params.cardId,
       { $pull: { likes: requestCustom.user._id } },
       { new: true },
-    );
+    ).populate(['owner', 'likes']);
     if (!likes) {
       const error = new NotFoundError('Такой карточки не существует');
       throw error;

@@ -1,4 +1,3 @@
-import * as dotenv from 'dotenv';
 import { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
@@ -7,10 +6,8 @@ import NotFoundError from '../errors/not-found-err';
 import BadRequestError from '../errors/bad-request-err';
 import ConflictError from '../errors/conflict-err';
 import User from '../models/user';
-import { IRequestCustom } from '../types';
+import { IRequestCustom, IErrorCustom } from '../types';
 import { resStatus } from '../utils';
-
-dotenv.config();
 
 export const createUser = async (req: Request, res: Response, next: NextFunction) => {
   const {
@@ -27,11 +24,17 @@ export const createUser = async (req: Request, res: Response, next: NextFunction
         avatar,
       }))
       .then((user) => {
-        res.status(resStatus.CREATED).send(user);
+        res.status(resStatus.CREATED).send({
+          email: user.email,
+          name: user.name,
+          about: user.about,
+          avatar: user.avatar,
+        });
       });
     return newUser;
   } catch (error) {
-    if (error instanceof Error && String(error.message).startsWith('E11000')) {
+    const err = error as IErrorCustom;
+    if (err.code === 11000) {
       return next(new ConflictError('Пользователь с такой почтой уже сущестует'));
     }
     return next(error);

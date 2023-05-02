@@ -13,20 +13,20 @@ export const auth = (req: Request, res: Response, next: NextFunction) => {
   const { authorization } = req.headers;
 
   if (!authorization || !authorization.startsWith('Bearer ')) {
-    const error = new UnauthorizedError('Необходима авторизация');
-    throw error;
+    next(new UnauthorizedError('Необходима авторизация'));
   }
-  const token = authorization.replace('Bearer ', '');
+  const token = authorization?.replace('Bearer ', '');
   let payload: jwt.JwtPayload;
   try {
-    payload = jwt.verify(token, JWT_SECRET as string) as jwt.JwtPayload;
+    if (token) {
+      payload = jwt.verify(token, JWT_SECRET as string) as jwt.JwtPayload;
+      requestCustom.user = {
+        _id: payload._id,
+      };
+    }
   } catch (error) {
-    return next(error);
+    return next(new UnauthorizedError('Необходима авторизация'));
   }
-
-  requestCustom.user = {
-    _id: payload._id,
-  };
 
   return next();
 };

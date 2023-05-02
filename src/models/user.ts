@@ -3,6 +3,7 @@ import {
 } from 'mongoose';
 import bcrypt from 'bcrypt';
 import UnauthorizedError from '../errors/unauthorized-err';
+import { LINK_REGEX, EMAIL_REGEX } from '../utils';
 
 export interface IUser {
   email: string;
@@ -23,6 +24,12 @@ const userSchema = new Schema<IUser, UserModel>(
       type: Schema.Types.String,
       unique: true,
       required: true,
+      validate: {
+        validator(v: string) {
+          return EMAIL_REGEX.test(v);
+        },
+        message: 'Неверный формат почты',
+      },
     },
     password: {
       type: String,
@@ -44,6 +51,12 @@ const userSchema = new Schema<IUser, UserModel>(
     avatar: {
       type: String,
       default: 'https://pictures.s3.yandex.net/resources/jacques-cousteau_1604399756.png',
+      validate: {
+        validator(v: string) {
+          return LINK_REGEX.test(v);
+        },
+        message: 'Неверный формат ссылки',
+      },
     },
   },
   { versionKey: false },

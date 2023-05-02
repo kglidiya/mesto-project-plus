@@ -1,6 +1,7 @@
 import mongoose, { model, Schema } from 'mongoose';
+import { LINK_REGEX } from '../utils';
 
-interface ICard {
+export interface ICard {
   name: string;
   link: string;
   owner: Schema.Types.ObjectId;
@@ -18,18 +19,26 @@ const cardSchema = new mongoose.Schema<ICard>({
   link: {
     type: String,
     required: true,
+    validate: {
+      validator(v: string) {
+        return LINK_REGEX.test(v);
+      },
+      message: 'Неверный формат ссылки',
+    },
   },
   owner: {
-    type: Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
     required: true,
   },
   likes: {
-    type: [Schema.Types.ObjectId],
+    type: [mongoose.Schema.Types.ObjectId],
+    ref: 'User',
     default: [],
   },
   createdAt: {
     type: Date,
-    default: Date.now(),
+    default: Date.now,
   },
 }, { versionKey: false });
 
